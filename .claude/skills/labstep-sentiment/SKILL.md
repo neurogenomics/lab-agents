@@ -1,11 +1,11 @@
 ---
 name: labstep-sentiment
-description: Analyse sentiment and outcome of Labstep experiments. Use when the user wants to understand how experiments went, whether results were positive or negative, or wants a sentiment/outcome summary across experiments.
+description: Summarise findings and researcher thoughts from Labstep experiments. Use when the user wants a research summary of experiments, key findings, or researcher observations across experiments.
 ---
 
-# Labstep Experiment Sentiment Skill
+# Labstep Experiment Research Summary Skill
 
-Analyse the sentiment and scientific outcome of experiments stored in Labstep. The primary rich text content lives in the `state` field of the **root sub-experiment**, accessible via the REST API directly (not via labstepPy).
+Summarise the key findings and researcher thoughts from experiments stored in Labstep. The primary rich text content lives in the `state` field of the **root sub-experiment**, accessible via the REST API directly (not via labstepPy).
 
 ## Authentication
 
@@ -110,32 +110,13 @@ def get_experiment_text(e, headers, base):
     return "\n".join(parts)
 ```
 
-## Sentiment Analysis Approach
+## Research Summary Approach
 
-Analyse each experiment's text and assign:
+For each experiment, produce a concise research summary with two components:
 
-**Sentiment** (one of):
-- `Positive` — experiment worked, results as expected, optimisation succeeded
-- `Negative` — experiment failed, troubleshooting needed, poor yield/quality
-- `Neutral` — routine/inconclusive, no clear outcome stated, template/blank entries
-- `Mixed` — partial success, some conditions worked and others didn't
+**Findings** — A 1–3 sentence summary of the key scientific results or observations. What was measured, what was observed, what conditions were tested. Focus on data and outcomes, not judgement.
 
-**Confidence** (one of): `High`, `Medium`, `Low`
-- High: explicit outcome language in body text ("worked", "failed", "good yield", "no signal")
-- Medium: indirect signals from name or partial body text
-- Low: name only, no body text available
-
-**Key signals:**
-- Positive: "success", "worked", "optimised", "good yield", "clean", "as expected", "best condition", "sent for sequencing"
-- Negative: "failed", "no signal", "low yield", "troubleshoot", "issue", "problem", "degraded", "contamination", "cancelled"
-- Neutral: blank body, template entries (`_YYYYMMDD`), reference/training experiments
-- Mixed: comparisons with clear winners and losers, "some conditions worked"
-
-**Name-based fallback when body is empty:**
-- "Repeat of:" → prior attempt had issues (lean Negative/Mixed)
-- "_YYYYMMDD" → blank template (Neutral)
-- "Troubleshoot" → Negative
-- "Best condition" / "Final" → Positive
+**Researcher Thoughts** — A 1–3 sentence summary capturing the researcher's own interpretation, next steps, or reflections as expressed in the notes. Include any stated plans for follow-up, optimisation ideas, or open questions. If the body text is sparse, note what can be inferred from the experiment name and protocols used.
 
 ## Output Format
 
@@ -143,16 +124,15 @@ Analyse each experiment's text and assign:
 results = []
 for e in experiments:
     text = get_experiment_text(e, headers, base)
-    sentiment, confidence, reasoning = analyse_sentiment(text)
+    findings, researcher_thoughts = summarise_experiment(text)
     results.append({
         'id': e.id,
         'custom_identifier': getattr(e, 'custom_identifier', ''),
         'name': e.name,
         'author': e.author.get('name', '') if isinstance(e.author, dict) else '',
         'created_at': (e.created_at or '')[:10],
-        'sentiment': sentiment,
-        'confidence': confidence,
-        'reasoning': reasoning,
+        'findings': findings,
+        'researcher_thoughts': researcher_thoughts,
         'body_text': text[:500],
     })
 ```
@@ -163,17 +143,10 @@ for e in experiments:
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 
-SENTIMENT_COLOURS = {
-    'Positive': 'C6EFCE',
-    'Negative': 'FFC7CE',
-    'Mixed':    'FFEB9C',
-    'Neutral':  'D9D9D9',
-}
-
 wb = openpyxl.Workbook()
 ws = wb.active
-ws.title = "Sentiment Analysis"
-headers = ["ID", "Custom ID", "Name", "Author", "Created At", "Sentiment", "Confidence", "Reasoning", "Body Text"]
+ws.title = "Research Summary"
+headers = ["ID", "Custom ID", "Name", "Author", "Created At", "Findings", "Researcher Thoughts", "Body Text"]
 ws.append(headers)
 
 header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
@@ -184,16 +157,14 @@ for cell in ws[1]:
 
 for row in results:
     ws.append([row['id'], row['custom_identifier'], row['name'], row['author'],
-               row['created_at'], row['sentiment'], row['confidence'],
-               row['reasoning'], row['body_text']])
-    colour = SENTIMENT_COLOURS.get(row['sentiment'], 'FFFFFF')
-    ws.cell(ws.max_row, 6).fill = PatternFill(start_color=colour, end_color=colour, fill_type="solid")
+               row['created_at'], row['findings'], row['researcher_thoughts'],
+               row['body_text']])
 
 for col in ws.columns:
     w = max((len(str(c.value)) if c.value else 0) for c in col)
     ws.column_dimensions[col[0].column_letter].width = min(w + 2, 60)
 
-wb.save('sentiment_analysis.xlsx')  # saves to working directory
+wb.save('research_summary.xlsx')  # saves to working directory
 ```
 
 ## Notes
