@@ -39,12 +39,9 @@ Parse the argument as an experiment ID (e.g. `SK550`) or a search term.
 Use the `labstep` skill's API to fetch experiment details:
 
 ```python
-import json, labstep
-from pathlib import Path
+import os, labstep
 
-with open(Path("config.json")) as f:
-    cfg = json.load(f)
-user = labstep.authenticate(cfg["api_key"])
+user = labstep.authenticate(apikey=os.environ["LABSTEP_API_KEY"])
 
 # Search by name/ID
 experiments = user.getExperiments(search_query="SK550", count=5)
@@ -66,66 +63,28 @@ From Labstep, attempt to extract:
 | **Methods** | Linked protocol body, or data field named "Methods" |
 | **Discussion** | Comments or data field named "Discussion" / "Notes" |
 
+**Always attempt Labstep lookup** — even if the experiment name doesn't match exactly, try partial matches (e.g. search for date, keywords from the folder name). Record which Labstep experiment was matched (if any) for the Sources section.
+
 If a field can't be found in Labstep, note it as missing — you'll ask the user in Step 4.
 
 ### Step 3 — Pull QC data from OneDrive (read-only)
 
 Read experiment files directly from the synced OneDrive folder. **All reads are strictly read-only.** Use retry logic since files may need time to sync from the cloud.
 
+Use the following utilities from other skills (do not redefine them):
+- **`find_onedrive_base()`**, **`read_with_retry()`**, **`LIBRARIES`**, **`find_experiment_folder()`** — see **`read-from-sharepoint`** skill
+- **`qubit_to_float()`**, **`find_column()`** — see **`rna-data`** skill
+
 ```python
-import pandas as pd, time
+import pandas as pd
 from pathlib import Path
 
-ONEDRIVE_BASE = Path(
-    "/Users/jaymoore/Library/CloudStorage/"
-    "OneDrive-SharedLibraries-ImperialCollegeLondon"
-)
-SCRNA_ROOT = ONEDRIVE_BASE / "Skene lab - WB - 07 scRNA-seq"
-SCTIP_ROOT = ONEDRIVE_BASE / "Skene lab - WB - 03 scTIP-Seq Development"
-
-def read_with_retry(read_fn, max_retries=3, delays=(2, 5, 10)):
-    """Retry a read that may fail due to OneDrive sync latency."""
-    last_err = None
-    for attempt in range(max_retries):
-        try:
-            result = read_fn()
-            if result is None:
-                raise ValueError("Read returned None — file may still be syncing")
-            return result
-        except (FileNotFoundError, PermissionError, OSError, ValueError) as e:
-            last_err = e
-            if attempt < max_retries - 1:
-                wait = delays[attempt] if attempt < len(delays) else delays[-1]
-                print(f"  Retry {attempt + 1}/{max_retries} in {wait}s: {e}")
-                time.sleep(wait)
-    raise last_err
-
-def find_folder(root: Path, prefix: str) -> Path | None:
-    try:
-        candidates = read_with_retry(
-            lambda: [p for p in root.iterdir() if p.is_dir() and p.name.startswith(prefix)]
-        )
-    except (FileNotFoundError, OSError):
-        return None
-    if not candidates:
-        return None
-    return max(candidates, key=lambda p: len(list(p.rglob("*.xlsx"))))
-
-def qubit_to_float(val) -> float | None:
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return None
-    s = str(val).strip().lower()
-    if s in ("tl", "too low", "/", "", "nan"):
-        return 0.0
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
+# These are provided by read-from-sharepoint and rna-data skills:
+# find_onedrive_base(), read_with_retry(), LIBRARIES, find_experiment_folder()
+# qubit_to_float(), find_column()
 ```
 
-**Search order for experiment folder:**
-1. `SCRNA_ROOT` (scRNA-seq library on OneDrive)
-2. `SCTIP_ROOT` (scTIP-seq library on OneDrive)
+**Search order**: `find_experiment_folder(exp_id)` searches all discovered OneDrive libraries automatically.
 
 **From the experiment folder, extract:**
 
@@ -134,12 +93,10 @@ def qubit_to_float(val) -> float | None:
 meta_files = read_with_retry(lambda: list(folder.glob("*Metadata*.xlsx")))
 if meta_files:
     df = read_with_retry(lambda: pd.read_excel(meta_files[0], sheet_name="Sheet1"))
-    qubit_col = "RNA Qubit Conc (ng/ul)"
-    for col in ["RNA Qubit Conc (ng/ul)", "Final Lib Qubit Conc (ng/ul)",
-                "Qubit Conc (ng/ul)", "Qubit (ng/ul)"]:
-        if col in df.columns:
-            qubit_col = col
-            break
+    qubit_col = find_column(df, [
+        "RNA Qubit Conc (ng/ul)", "Final Lib Qubit Conc (ng/ul)",
+        "Qubit Conc (ng/ul)", "Qubit (ng/ul)", "Qubit",
+    ])
     samples = []
     for _, row in df.iterrows():
         name = str(row.get("Aim", row.get("Sample", f"Sample {_ + 1}")))
@@ -148,26 +105,76 @@ if meta_files:
 ```
 
 #### TapeStation data
+
+Format TapeStation as a **per-sample table** (list of dicts), not a single summary value:
+
 ```python
-# From Metadata.xlsx
-ts_conc_col = "TapeStation HS D5000 100-1000 bp Conc (ng/ul)"
-ts_peak_col = "TapeStation HS D5000 peak (bp)"
-if ts_conc_col in df.columns and df[ts_conc_col].notna().any():
-    tapestation = {
-        "conc": str(df[ts_conc_col].dropna().iloc[0]),
-        "size": str(df[ts_peak_col].dropna().iloc[0]) if ts_peak_col in df.columns else "",
-    }
+# From Metadata.xlsx — per-sample TapeStation values (fuzzy match)
+ts_conc_col = find_column(df, [
+    "TapeStation HS D5000 100-1000 bp Conc (ng/ul)",
+    "TapeStation Conc (ng/ul)", "TS Conc (ng/ul)",
+])
+ts_peak_col = find_column(df, [
+    "TapeStation HS D5000 peak (bp)", "TapeStation peak (bp)", "TS peak (bp)",
+])
+tapestation_samples = []
+if ts_conc_col and df[ts_conc_col].notna().any():
+    for _, row in df.iterrows():
+        name = str(row.get("Aim", row.get("Sample", f"Sample {_ + 1}")))
+        conc = row.get(ts_conc_col)
+        peak = row.get(ts_peak_col) if ts_peak_col in df.columns else None
+        if pd.notna(conc):
+            tapestation_samples.append({
+                "name": name,
+                "conc": str(conc),
+                "peak": str(peak) if pd.notna(peak) else "",
+            })
 else:
     # Fall back to TapeStation sampleTable CSV
     csvs = read_with_retry(lambda: list(folder.rglob("*sampleTable.csv")))
     if csvs:
         ts_df = read_with_retry(lambda: pd.read_csv(csvs[0], encoding="latin-1"))
         ts_df = ts_df[~ts_df["Sample Description"].str.lower().str.contains("ladder", na=False)]
-        tapestation = {
-            "conc": f"{ts_df['Conc. [pg/µl]'].mean() / 1000:.2f} ng/µl (mean)",
-            "size": "",
-        }
+        for _, row in ts_df.iterrows():
+            name = str(row.get("Sample Description", f"Sample {_ + 1}"))
+            conc_pg = row.get("Conc. [pg/µl]", None)
+            conc_ng = f"{float(conc_pg) / 1000:.2f}" if pd.notna(conc_pg) else ""
+            tapestation_samples.append({"name": name, "conc": conc_ng, "peak": ""})
 ```
+
+#### EVOS Images
+```python
+from PIL import Image
+import pillow_heif
+pillow_heif.register_heif_opener()
+
+def make_thumbnails(folder: Path, output_dir: Path, max_size: int = 800) -> list[dict]:
+    """Convert EVOS images (.heic/.png/.tif) to PNG thumbnails for embedding.
+    Reads from OneDrive (read-only), writes thumbnails to output_dir (local).
+    Returns list of {"name": str, "path": Path} for each thumbnail."""
+    evos_dir = folder / "EVOS Images"
+    if not evos_dir.exists():
+        return []
+    output_dir.mkdir(parents=True, exist_ok=True)
+    thumbnails = []
+    for img_path in sorted(evos_dir.iterdir()):
+        if img_path.suffix.lower() not in (".heic", ".png", ".tif", ".tiff", ".jpg", ".jpeg"):
+            continue
+        try:
+            if img_path.stat().st_size == 0:
+                print(f"  Warning: skipping empty file {img_path.name}")
+                continue
+            img = read_with_retry(lambda p=img_path: Image.open(p))
+            img.thumbnail((max_size, max_size))
+            out = output_dir / f"{img_path.stem}.png"
+            img.save(out, "PNG")
+            thumbnails.append({"name": img_path.stem, "path": out})
+        except Exception as e:
+            print(f"  Warning: could not convert {img_path.name}: {e}")
+    return thumbnails
+```
+
+**Thumbnail output** is saved to `<experiment_id>_thumbnails/` in the working directory (never to OneDrive).
 
 #### If files fail after all retries
 Report the error and suggest the user check OneDrive sync status (System Settings > OneDrive).
@@ -208,11 +215,22 @@ def fill_experiment_summary(
     aim: str,
     methods: str,
     qubit_samples: list[dict],
-    tapestation: dict | None = None,
+    tapestation_samples: list[dict] | None = None,
     qpcr: str | None = None,
     discussion: str = "",
+    thumbnails: list[dict] | None = None,
+    sources: list[dict] | None = None,
 ):
+    from docx.shared import Inches, Pt
+
     doc = Document(str(TEMPLATE))
+
+    # Validate template structure
+    if len(doc.tables) < 4:
+        raise ValueError(
+            f"Template has {len(doc.tables)} tables but 4 are expected "
+            "(Qubit, EVOS, TapeStation, qPCR). Check the template file."
+        )
 
     # Fill header paragraphs
     for p in doc.paragraphs:
@@ -238,20 +256,64 @@ def fill_experiment_summary(
         row.cells[0].text = str(sample["name"])
         row.cells[1].text = str(sample.get("conc", ""))
 
-    # Fill TapeStation (Table 2)
-    if tapestation:
-        ts_cell = doc.tables[2].rows[1].cells[0]
-        ts_cell.text = (
-            f"Dilution: {tapestation.get('dilution', '')}\n\n"
-            f"Spectrum: {tapestation.get('spectrum', '')}\n\n"
-            f"Size: {tapestation.get('size', '')}\n"
-            f"Conc.: {tapestation.get('conc', '')}\n"
-            f"Peak molarity (accounted for dilution): {tapestation.get('molarity', '')}"
-        )
+    # Fill EVOS Imaging table (Table 1) with thumbnails
+    if thumbnails:
+        img_table = doc.tables[1]
+        # Clear existing placeholder content
+        for row in img_table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    p.clear()
+        # Place thumbnails into cells: 2 per row, starting at row 0
+        # Row 0 is the header row — keep it, start images from row 1
+        cell_idx = 0
+        for thumb in thumbnails:
+            row_i = 1 + cell_idx // 2
+            col_i = cell_idx % 2
+            # Add rows if needed
+            while row_i >= len(img_table.rows):
+                img_table.add_row()
+            cell = img_table.rows[row_i].cells[col_i]
+            cell.paragraphs[0].clear()
+            cell.paragraphs[0].add_run(f"{thumb['name']}\n")
+            cell.paragraphs[0].add_run().add_picture(str(thumb["path"]), width=Inches(2.8))
+            cell_idx += 1
+
+    # Fill TapeStation (Table 2) — per-sample rows: Sample | Conc (ng/µl) | Peak (bp)
+    if tapestation_samples:
+        ts_table = doc.tables[2]
+        # Clear existing rows (keep header row 0)
+        while len(ts_table.rows) > 1:
+            ts_table._tbl.remove(ts_table.rows[1]._tr)
+        # Add header if table was a single-cell layout — rebuild as 3-column
+        # If template already has columns, just add data rows
+        for sample in tapestation_samples:
+            row = ts_table.add_row()
+            row.cells[0].text = str(sample["name"])
+            if len(row.cells) > 1:
+                row.cells[1].text = str(sample.get("conc", ""))
+            if len(row.cells) > 2:
+                row.cells[2].text = str(sample.get("peak", ""))
 
     # Fill qPCR (Table 3)
     if qpcr:
         doc.tables[3].rows[1].cells[0].text = qpcr
+
+    # Append Sources & Provenance section at the end of the document
+    if sources:
+        doc.add_paragraph()  # spacer
+        p = doc.add_paragraph()
+        run = p.add_run("Data Sources & File Paths")
+        run.bold = True
+        run.font.size = Pt(11)
+        for src in sources:
+            field = src.get("field", "")
+            origin = src.get("source", "")
+            path = src.get("path", "")
+            line = f"{field}: {origin}"
+            if path:
+                line += f"\n    {path}"
+            doc.add_paragraph(f"  - {line}")
 
     doc.save(output_path)
     return output_path
@@ -263,6 +325,22 @@ def fill_experiment_summary(
 - Tell the user the output path
 - **Never overwrite the template**
 - **Never write any file to OneDrive paths**
+
+### Sources section
+
+Every generated summary **must** include a "Data Sources & File Paths" section at the bottom of the document. Track provenance for every field by building a `sources` list during Steps 2–3:
+
+```python
+sources = []
+# Example entries:
+sources.append({"field": "Model", "source": "Labstep experiment 350101", "path": ""})
+sources.append({"field": "Qubit", "source": "OneDrive Metadata.xlsx", "path": "<OneDrive>/SK550_.../Metadata.xlsx"})
+sources.append({"field": "TapeStation", "source": "OneDrive sampleTable CSV", "path": "<OneDrive>/Tapestation/sampleTable.csv"})
+sources.append({"field": "EVOS Images", "source": "OneDrive EVOS Images/ (6 files)", "path": "<OneDrive>/EVOS Images/"})
+sources.append({"field": "Discussion", "source": "User input", "path": ""})
+```
+
+This allows anyone reading the summary to trace every data point back to its origin file or API call. Always use **full file paths** for OneDrive sources. For Labstep, include the experiment ID and name.
 
 ---
 
@@ -298,7 +376,7 @@ The template has 4 tables:
 ## Dependencies
 
 ```
-pip install python-docx labstep pandas openpyxl
+pip install python-docx labstep pandas openpyxl Pillow pillow-heif
 ```
 
 ---

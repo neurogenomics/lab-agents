@@ -30,9 +30,9 @@ All skills are located in `.claude/skills/` and are auto-triggered based on cont
 ### 4. **read-from-sharepoint**
 - **Purpose**: Read-only access to lab data from synced OneDrive (SharePoint) folders
 - **Trigger**: Any skill or task needing experiment data files
-- **Data locations**:
-  - `~/Library/CloudStorage/OneDrive-SharedLibraries-ImperialCollegeLondon/Skene lab - WB - 07 scRNA-seq/`
-  - `~/Library/CloudStorage/OneDrive-SharedLibraries-ImperialCollegeLondon/Skene lab - WB - 03 scTIP-Seq Development/`
+- **Data locations** (auto-detected per OS via `find_onedrive_base()`):
+  - `<OneDrive root>/Skene lab - WB - 07 scRNA-seq/`
+  - `<OneDrive root>/Skene lab - WB - 03 scTIP-Seq Development/`
 - **Retry**: Files may need time to sync from cloud — retries up to 3 times with delays (2s, 5s, 10s)
 
 ### 5. **rna-data**

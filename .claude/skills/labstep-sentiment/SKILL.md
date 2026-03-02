@@ -10,17 +10,11 @@ Analyse the sentiment and scientific outcome of experiments stored in Labstep. T
 ## Authentication
 
 ```python
-import json, requests, labstep
+import os, requests, labstep
 from labstep.service.config import configService
 
-from pathlib import Path
-ROOT = Path(__file__).resolve().parents[4]  # project root
-
-with open(ROOT / 'config.json') as f:
-    cfg = json.load(f)
-
-user = labstep.authenticate(cfg['email'], cfg['api_key'])
-api_key = cfg['api_key']
+api_key = os.environ["LABSTEP_API_KEY"]
+user = labstep.authenticate(apikey=api_key)
 base = configService.getHost()          # https://api.labstep.com
 headers = {"apikey": api_key}
 ```
@@ -88,7 +82,7 @@ def get_experiment_text(e, headers, base):
             value = getattr(field, 'value', '') or ''
             if value:
                 parts.append(f"{label}: {value}")
-    except:
+    except Exception:
         pass
 
     # Protocol names
@@ -96,7 +90,7 @@ def get_experiment_text(e, headers, base):
         for protocol in e.getProtocols():
             if protocol.name:
                 parts.append(f"Protocol: {protocol.name}")
-    except:
+    except Exception:
         pass
 
     return "\n".join(parts)
@@ -185,7 +179,7 @@ for col in ws.columns:
     w = max((len(str(c.value)) if c.value else 0) for c in col)
     ws.column_dimensions[col[0].column_letter].width = min(w + 2, 60)
 
-wb.save('/Users/jaymoore/Documents/JAY_PhD/imperial/experimental-patent/outputs/sentiment_analysis.xlsx')
+wb.save('sentiment_analysis.xlsx')  # saves to working directory
 ```
 
 ## Notes

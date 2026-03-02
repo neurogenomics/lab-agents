@@ -9,20 +9,23 @@ You are helping the user interact with the Labstep API using the `labstep` Pytho
 
 ## Authentication
 
-Always load credentials from `/Users/jaymoore/.claude/labstep_config.json`:
+Authenticate using the `LABSTEP_API_KEY` environment variable:
 
 ```python
-import json
+import os
 import labstep
 
-from pathlib import Path
-ROOT = Path(__file__).resolve().parents[4]  # project root (4 levels up from .claude/skills/labstep/)
-
-with open(ROOT / 'config.json') as f:
-    cfg = json.load(f)
-
-user = labstep.authenticate(cfg['api_key'])
+user = labstep.authenticate(apikey=os.environ["LABSTEP_API_KEY"])
 ```
+
+## Read-Only Policy
+
+This skill uses a read-only service account. **Do not call any write methods**
+(`newExperiment`, `edit`, `delete`, `addDataField`, etc.) unless the user
+explicitly confirms with the phrase **"confirm write"**. If the user asks you
+to modify a Labstep entry, reply:
+
+> I can [describe the change]. To proceed, please confirm write: `confirm write`
 
 ## Package
 

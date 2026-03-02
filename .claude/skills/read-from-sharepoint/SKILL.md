@@ -32,18 +32,69 @@ Forbidden operations:
 
 ## OneDrive base paths
 
+The OneDrive sync location varies by OS and user. Detect it automatically:
+
 ```python
+import os, platform
 from pathlib import Path
 
-ONEDRIVE_BASE = Path(
-    "/Users/jaymoore/Library/CloudStorage/"
-    "OneDrive-SharedLibraries-ImperialCollegeLondon"
-)
+def find_onedrive_base() -> Path:
+    """Auto-detect the OneDrive shared library root for Imperial College London.
+    Works on macOS and Windows."""
+    system = platform.system()
+    home = Path.home()
 
-LIBRARIES = {
-    "scrna": ONEDRIVE_BASE / "Skene lab - WB - 07 scRNA-seq",
-    "sctip": ONEDRIVE_BASE / "Skene lab - WB - 03 scTIP-Seq Development",
-}
+    if system == "Darwin":  # macOS
+        base = home / "Library" / "CloudStorage"
+    elif system == "Windows":
+        # OneDrive Business typically syncs here
+        base = home / "OneDrive - Imperial College London"
+        if base.exists():
+            return base
+        # Fallback: check LOCALAPPDATA or common locations
+        base = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "OneDrive"
+    else:
+        raise OSError(f"Unsupported platform: {system}")
+
+    # Find the Imperial shared library folder
+    if base.exists():
+        candidates = [p for p in base.iterdir()
+                      if p.is_dir() and "ImperialCollegeLondon" in p.name]
+        if candidates:
+            return candidates[0]
+        # Try broader match
+        candidates = [p for p in base.iterdir()
+                      if p.is_dir() and "Imperial" in p.name]
+        if candidates:
+            return candidates[0]
+
+    raise FileNotFoundError(
+        f"OneDrive Imperial folder not found. Searched: {base}\n"
+        "Ensure OneDrive is installed and syncing the Skene lab shared libraries."
+    )
+
+ONEDRIVE_BASE = find_onedrive_base()
+
+def discover_libraries(base: Path) -> dict[str, Path]:
+    """Auto-discover Skene lab shared libraries under OneDrive base.
+    Scans for folders prefixed with 'Skene lab -' and generates short aliases."""
+    import re
+    libs = {}
+    if not base.exists():
+        return libs
+    for p in sorted(base.iterdir()):
+        if not p.is_dir() or not p.name.startswith("Skene lab -"):
+            continue
+        # Extract the descriptive part after the number, e.g. "07 scRNA-seq" → "scrna"
+        match = re.search(r"\d+\s+(.+)$", p.name.split(" - ")[-1])
+        if match:
+            alias = re.sub(r"[^a-z0-9]", "", match.group(1).lower())
+        else:
+            alias = re.sub(r"[^a-z0-9]", "", p.name.split(" - ")[-1].lower())
+        libs[alias] = p
+    return libs
+
+LIBRARIES = discover_libraries(ONEDRIVE_BASE)
 ```
 
 ## Retry logic for cloud-synced files
@@ -66,7 +117,6 @@ def read_with_retry(read_fn, max_retries=3, delays=(2, 5, 10)):
     for attempt in range(max_retries):
         try:
             result = read_fn()
-            # Guard against empty results from partially-synced files
             if result is None:
                 raise ValueError("Read returned None — file may still be syncing")
             return result
@@ -98,28 +148,31 @@ contents = read_with_retry(lambda: list(folder.iterdir()))
 ## Finding experiment folders
 
 ```python
-def find_experiment_folder(experiment_id: str, library: str = "scrna") -> Path | None:
+def find_experiment_folder(experiment_id: str, library: str | None = None) -> Path | None:
     """
-    Find an experiment folder by ID prefix in the OneDrive library.
+    Find an experiment folder by ID prefix in OneDrive libraries.
+    If library is specified, search only that library.
+    Otherwise, search all discovered libraries and return the first match.
     Returns the best match (most data files) or None.
     """
-    root = LIBRARIES.get(library)
-    if root is None or not root.exists():
-        return None
+    search_libs = [LIBRARIES[library]] if library and library in LIBRARIES else LIBRARIES.values()
 
-    try:
-        candidates = read_with_retry(
-            lambda: [p for p in root.iterdir() if p.is_dir() and p.name.startswith(experiment_id)]
-        )
-    except (FileNotFoundError, OSError):
-        return None
+    for root in search_libs:
+        if not root.exists():
+            continue
+        try:
+            candidates = read_with_retry(
+                lambda r=root: [p for p in r.iterdir() if p.is_dir() and p.name.startswith(experiment_id)]
+            )
+        except (FileNotFoundError, OSError):
+            continue
+        if not candidates:
+            continue
+        if len(candidates) == 1:
+            return candidates[0]
+        return max(candidates, key=lambda p: len(list(p.rglob("*.xlsx"))))
 
-    if not candidates:
-        return None
-    if len(candidates) == 1:
-        return candidates[0]
-    # Prefer folder with most data files
-    return max(candidates, key=lambda p: len(list(p.rglob("*.xlsx"))))
+    return None
 ```
 
 ## Common file patterns in experiment folders
@@ -136,6 +189,8 @@ def find_experiment_folder(experiment_id: str, library: str = "scrna") -> Path |
 ## Important notes
 
 - **Always output the full OneDrive path** when reporting which file was read, so the user can verify
-- **If a file fails after all retries**, report the error clearly and suggest the user check that OneDrive is synced (System Settings > OneDrive > sync status)
+- **If a file fails after all retries**, report the error clearly and suggest the user check that OneDrive is synced
+  - macOS: System Settings > OneDrive > sync status
+  - Windows: OneDrive system tray icon > sync status
 - **Never cache or copy** OneDrive files to local directories without explicit user request
 - **All output files** (generated summaries, plots, etc.) must be saved to the **working directory**, never to OneDrive paths

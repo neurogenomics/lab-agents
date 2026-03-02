@@ -1,68 +1,94 @@
 # Lab-Agents
 
-A shared Claude agent environment for the Imperial College London Neurogenomics lab, with integrated access to Labstep (lab notebook), SharePoint (shared documents), and local data analysis tools.
+A shared Claude Code environment for the Imperial College London Neurogenomics lab, with integrated access to Labstep (lab notebook), OneDrive/SharePoint (shared data files), and local data analysis tools.
 
-## Features
+## Skills
 
-- **5 Built-in Skills**:
-  - `labstep`: Query experiments, protocols, and lab records (read-only)
-  - `labstep-sentiment`: Analyze trends in lab notes
-  - `pptx`: Generate and modify PowerPoint presentations
-  - `sctipseq-data`: Query and analyze single-cell RNA-seq datasets
-  - `sync-data`: Sync SharePoint data to local mirror
+### 1. labstep
 
-- **Read-Only Access**: All Labstep and SharePoint access is read-only by design
-  - Write operations require explicit user confirmation
-  - Azure AD app scoped to read-only permissions
-  - Labstep uses dedicated viewer-only service account
+Query experiments, protocols, inventory, and other entities from the Labstep electronic lab notebook (read-only).
 
-- **Local Data Pipeline**: SharePoint data synchronized to local mirror for fast querying
+```
+> Show me the last 10 experiments
+> What protocols are linked to SK550?
+> Search for experiments mentioning "lysis buffer"
+> List all resources tagged "antibody"
+```
+
+### 2. labstep-sentiment
+
+Analyse the sentiment and scientific outcome of Labstep experiments — whether they succeeded, failed, or were inconclusive.
+
+```
+> Analyse the sentiment of all experiments from January 2026
+> Which experiments failed in the last 3 months?
+> Give me a sentiment summary across all IVT optimisation experiments
+> Export sentiment analysis to Excel
+```
+
+### 3. rna-data
+
+Read and extract RNA quantification data (Qubit, TapeStation, qPCR) from experiment folders on OneDrive.
+
+```
+> What are the Qubit concentrations for SK550?
+> Show me the TapeStation results for SK109
+> Compare RNA Qubit yields between SK443 and SK447
+> Compare HiScribe vs RiboMax RNA yields across all IVT experiments
+> Are there any TapeStation warnings or alerts in SK172?
+> What are the TapeStation peak sizes for each sample in SK134?
+```
+
+### 4. read-from-sharepoint
+
+Read-only access to lab data files from synced OneDrive (SharePoint) folders. Auto-discovers all Skene lab shared libraries.
+
+```
+> List all experiment folders in the scRNA-seq library
+> Find the experiment folder for SK457
+> What files are in the SK550 folder?
+> Show me the Metadata.xlsx for SK297
+```
+
+### 5. experiment-summary
+
+Generate a filled-in Experiment Summary `.docx` from Labstep metadata and OneDrive QC data. User-invocable via `/experiment-summary`.
+
+```
+> /experiment-summary SK550
+> Write up an experiment summary for SK443
+> Generate the experiment summary for "New lysis buffer test"
+```
+
+### 6. pptx
+
+Generate and modify PowerPoint presentations from data or text.
+
+```
+> Create a slide deck summarising the IVT optimisation results
+> Add a slide with the Qubit bar chart to my presentation
+> Read the contents of results_deck.pptx
+```
 
 ## Quick Start
 
 ### Prerequisites
-- Claude CLI installed (`pip install anthropic-cli` or equivalent)
-- Azure AD app registration (for SharePoint access)
-- Labstep read-only account setup
+- Claude Code CLI installed
+- OneDrive syncing the Skene lab shared libraries
+- `LABSTEP_API_KEY` environment variable set (read-only service account)
 
 ### Setup
 
-1. **Follow the detailed setup guide**:
-   ```bash
-   # Read this first:
-   cat SETUP_INSTRUCTIONS.md
-   ```
-
-2. **Register Azure AD app** for SharePoint (Part 1 of SETUP_INSTRUCTIONS.md)
-
-3. **Create Labstep read-only account** (Part 2 of SETUP_INSTRUCTIONS.md)
-
-4. **Fill in credentials**:
-   ```bash
-   # Edit this file with your credentials:
-   vi .claude/settings.json
-   ```
-
-5. **Verify everything works**:
-   ```bash
-   cd /Users/jaymoore/Documents/JAY_PhD/imperial/lab-agents
-   claude "What skills are available?"
-   # Should list all 5 skills
-   ```
-
-## Documentation
-
-- **`CLAUDE.md`** — Team policies, security guidelines, and skill documentation
-- **`SETUP_INSTRUCTIONS.md`** — Step-by-step setup for Azure AD and Labstep
-- **`SETUP_CHECKLIST.md`** — Progress tracking and verification tests
-- **`.claude/skills/*/SKILL.md`** — Individual skill documentation
+1. Follow the detailed setup guide in `SETUP_INSTRUCTIONS.md`
+2. Set your Labstep API key: `export LABSTEP_API_KEY="your-key-here"`
+3. Ensure OneDrive is syncing (System Settings > OneDrive)
+4. Verify: `claude "What skills are available?"`
 
 ## Security
 
-✅ **Read-only by design**:
-- SharePoint access via `msgraph-mcp` with `Sites.Read.All`, `Files.Read.All` scopes only
-- Labstep uses dedicated viewer-only service account
-- All write operations require explicit user confirmation ("confirm write")
+- **OneDrive is strictly read-only** — agents will never write, move, rename, or delete files under OneDrive paths
+- **Labstep is read-only** — write operations require explicit user confirmation (`confirm write`)
+- **All output files** are saved to the working directory, never to shared locations
 - Credentials stored in `.claude/settings.json` (git-ignored)
 
 ## Folder Structure
@@ -71,44 +97,28 @@ A shared Claude agent environment for the Imperial College London Neurogenomics 
 lab-agents/
 ├── .claude/
 │   ├── settings.json          # Credentials (git-ignored)
-│   └── skills/                # 5 available skills
+│   └── skills/
 │       ├── labstep/
 │       ├── labstep-sentiment/
 │       ├── pptx/
-│       ├── sctipseq-data/
-│       └── sync-data/
-├── CLAUDE.md                  # Team policies
+│       ├── read-from-sharepoint/
+│       ├── rna-data/
+│       └── experiment-summary/
+├── support/                   # Templates (Experiment Summary Template.docx)
+├── CLAUDE.md                  # Team policies & skill docs
 ├── SETUP_INSTRUCTIONS.md      # Detailed setup guide
 ├── SETUP_CHECKLIST.md         # Progress tracker
-├── README.md                  # This file
-└── .gitignore                 # Protects sensitive files
+└── README.md                  # This file
 ```
 
-## Team Usage
+## Documentation
 
-All agents in this environment inherit the same security policies:
-- Skills are auto-triggered based on context
-- SharePoint access is read-only (no downloads of confidential docs)
-- Labstep access is read-only (no experiment modifications)
-- Write operations require explicit confirmation with phrase: "confirm write"
-
-See `CLAUDE.md` for full policies.
-
-## Support & Troubleshooting
-
-- **Azure setup issues**: See SETUP_INSTRUCTIONS.md Part 1
-- **Labstep setup issues**: See SETUP_INSTRUCTIONS.md Part 2
-- **Credential issues**: Check `.claude/settings.json` format
-- **Skill-specific help**: See individual `SKILL.md` files in `.claude/skills/`
+- **`CLAUDE.md`** — Team policies, security guidelines, and skill reference
+- **`SETUP_INSTRUCTIONS.md`** — Step-by-step Azure AD and Labstep setup
+- **`.claude/skills/*/SKILL.md`** — Individual skill documentation
 
 ## Links
 
-- [Imperial College London](https://www.imperial.ac.uk/)
 - [Neurogenomics Lab GitHub](https://github.com/neurogenomics)
 - [Labstep Docs](https://docs.labstep.com/)
-- [Azure AD App Registration](https://docs.microsoft.com/en-us/azure/active-directory/develop/)
-- [Claude Documentation](https://claude.ai/docs)
-
----
-
-**Last updated**: March 2, 2026
+- [Claude Code Docs](https://docs.anthropic.com/en/docs/claude-code)
