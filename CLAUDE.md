@@ -35,7 +35,7 @@ All skills are located in `.claude/skills/` and are auto-triggered based on cont
   - `<OneDrive root>/Skene lab - WB - 03 scTIP-Seq Development/`
 - **Retry**: Files may need time to sync from cloud — retries up to 3 times with delays (2s, 5s, 10s)
 
-### 5. **rna-data**
+### 5. **nucleic-acid-analysis**
 - **Purpose**: Read and extract RNA quantification data (Qubit, TapeStation, qPCR)
 - **Trigger**: Questions about RNA-seq datasets, QC metrics
 - **Data source**: OneDrive folders (via `read-from-sharepoint`)
@@ -84,7 +84,7 @@ The `labstep` skill uses a dedicated read-only service account:
 
 ### Data Pipeline
 1. Read experiment data directly from OneDrive synced folders (via `read-from-sharepoint` skill)
-2. Query `rna-data` or other analysis skills against OneDrive data
+2. Query `nucleic-acid-analysis` or other analysis skills against OneDrive data
 3. Use `pptx` skill to generate reports/presentations
 4. All output files are saved locally in the working directory — no write-back to OneDrive or Labstep without explicit user request + confirmation
 

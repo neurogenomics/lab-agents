@@ -7,7 +7,7 @@
   - ✅ `labstep-sentiment/`
   - ✅ `pptx/` (with scripts/ subdirectory)
   - ✅ `read-from-sharepoint/`
-  - ✅ `rna-data/`
+  - ✅ `nucleic-acid-analysis/`
   - ✅ `experiment-summary/`
 
 - [x] **CLAUDE.md** — Team policies and skill documentation

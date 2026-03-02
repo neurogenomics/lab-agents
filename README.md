@@ -26,13 +26,13 @@ Analyse the sentiment and scientific outcome of Labstep experiments — whether 
 > Export sentiment analysis to Excel
 ```
 
-### 3. rna-data
+### 3. nucleic-acid-analysis
 
 Read and extract RNA quantification data (Qubit, TapeStation, qPCR) from experiment folders on OneDrive.
 
 ```
-> What are the Qubit concentrations for SK550?
-> Show me the TapeStation results for SK109
+> What are the Qubit concentrations for SK543?
+> Show me the TapeStation results for SK134
 > Compare RNA Qubit yields between SK443 and SK447
 > Compare HiScribe vs RiboMax RNA yields across all IVT experiments
 > Are there any TapeStation warnings or alerts in SK172?
@@ -102,7 +102,7 @@ lab-agents/
 │       ├── labstep-sentiment/
 │       ├── pptx/
 │       ├── read-from-sharepoint/
-│       ├── rna-data/
+│       ├── nucleic-acid-analysis/
 │       └── experiment-summary/
 ├── support/                   # Templates (Experiment Summary Template.docx)
 ├── CLAUDE.md                  # Team policies & skill docs

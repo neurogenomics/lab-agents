@@ -1,5 +1,5 @@
 ---
-name: rna-data
+name: nucleic-acid-analysis
 description: >
   Read and extract RNA quantification data (Qubit, TapeStation, qPCR) from
   experiment folders on OneDrive. Use when the user wants to read Metadata.xlsx,

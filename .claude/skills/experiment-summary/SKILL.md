@@ -162,13 +162,13 @@ Read experiment files directly from the synced OneDrive folder. **All reads are 
 
 Use the following utilities from other skills (do not redefine them):
 - **`find_onedrive_base()`**, **`read_with_retry()`**, **`LIBRARIES`**, **`find_experiment_folder()`** — see **`read-from-sharepoint`** skill
-- **`qubit_to_float()`**, **`find_column()`** — see **`rna-data`** skill
+- **`qubit_to_float()`**, **`find_column()`** — see **`nucleic-acid-analysis`** skill
 
 ```python
 import pandas as pd
 from pathlib import Path
 
-# These are provided by read-from-sharepoint and rna-data skills:
+# These are provided by read-from-sharepoint and nucleic-acid-analysis skills:
 # find_onedrive_base(), read_with_retry(), LIBRARIES, find_experiment_folder()
 # qubit_to_float(), find_column()
 ```
