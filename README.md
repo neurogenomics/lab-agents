@@ -10,20 +10,20 @@ Query experiments, protocols, inventory, and other entities from the Labstep ele
 
 ```
 > Show me the last 10 experiments
-> What protocols are linked to SK550?
+> What protocols are linked to SK543?
 > Search for experiments mentioning "lysis buffer"
 > List all resources tagged "antibody"
 ```
 
 ### 2. labstep-sentiment
 
-Analyse the sentiment and scientific outcome of Labstep experiments — whether they succeeded, failed, or were inconclusive.
+Summarise key findings and researcher thoughts from Labstep experiments.
 
 ```
-> Analyse the sentiment of all experiments from January 2026
-> Which experiments failed in the last 3 months?
-> Give me a sentiment summary across all IVT optimisation experiments
-> Export sentiment analysis to Excel
+> Summarise findings from all experiments in January 2026
+> What were the key results from the IVT optimisation experiments?
+> Give me a research summary across all lysis buffer experiments
+> Export experiment summaries to Excel
 ```
 
 ### 3. nucleic-acid-analysis
@@ -31,12 +31,12 @@ Analyse the sentiment and scientific outcome of Labstep experiments — whether 
 Read and extract RNA quantification data (Qubit, TapeStation, qPCR) from experiment folders on OneDrive.
 
 ```
-> What are the Qubit concentrations for SK543?
+> What are the Qubit concentrations for SK443?
 > Show me the TapeStation results for SK134
 > Compare RNA Qubit yields between SK443 and SK447
 > Compare HiScribe vs RiboMax RNA yields across all IVT experiments
 > Are there any TapeStation warnings or alerts in SK172?
-> What are the TapeStation peak sizes for each sample in SK134?
+> What are the TapeStation peak sizes for each sample in SK297?
 ```
 
 ### 4. read-from-sharepoint
@@ -46,7 +46,7 @@ Read-only access to lab data files from synced OneDrive (SharePoint) folders. Au
 ```
 > List all experiment folders in the scRNA-seq library
 > Find the experiment folder for SK457
-> What files are in the SK550 folder?
+> What files are in the SK443 folder?
 > Show me the Metadata.xlsx for SK297
 ```
 
@@ -55,9 +55,9 @@ Read-only access to lab data files from synced OneDrive (SharePoint) folders. Au
 Generate a filled-in Experiment Summary `.docx` from Labstep metadata and OneDrive QC data. User-invocable via `/experiment-summary`.
 
 ```
-> /experiment-summary SK550
-> Write up an experiment summary for SK443
-> Generate the experiment summary for "New lysis buffer test"
+> /experiment-summary SK443
+> Write up an experiment summary for SK297
+> Generate the experiment summary for "IVT kit comparison"
 ```
 
 ### 6. pptx

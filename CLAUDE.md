@@ -18,7 +18,7 @@ All skills are located in `.claude/skills/` and are auto-triggered based on cont
 - **Access**: Read-only (see below)
 
 ### 2. **labstep-sentiment**
-- **Purpose**: Analyze sentiment/themes in lab notes
+- **Purpose**: Summarise key findings and researcher thoughts from lab notes
 - **Trigger**: Questions about trends or patterns in experiment notes
 - **Dependency**: Requires `labstep` skill access
 
