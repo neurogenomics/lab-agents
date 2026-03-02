@@ -4,8 +4,7 @@
 
 This is a shared agent environment for the Imperial Lab team. Agents have access to:
 - **Labstep**: Lab notebook (read-only by default)
-- **SharePoint**: Shared document access (read-only)
-- **Local data**: Synchronized copies of SharePoint data, lab-specific analysis skills
+- **OneDrive (SharePoint)**: Shared data files via synced OneDrive folders (strictly read-only)
 
 ---
 
@@ -17,7 +16,6 @@ All skills are located in `.claude/skills/` and are auto-triggered based on cont
 - **Purpose**: Fetch and query Labstep experiments, protocols, and inventory
 - **Trigger**: Questions about experiments, protocols, or lab records
 - **Access**: Read-only (see below)
-- **MCP**: Direct API integration with Labstep
 
 ### 2. **labstep-sentiment**
 - **Purpose**: Analyze sentiment/themes in lab notes
@@ -29,15 +27,23 @@ All skills are located in `.claude/skills/` and are auto-triggered based on cont
 - **Trigger**: Requests to create slides, generate reports, or present data
 - **Scripts**: Includes `/scripts` subdirectory with helper utilities
 
-### 4. **sync-data**
-- **Purpose**: Synchronize local SharePoint mirror via rsync
-- **Trigger**: "sync sharepoint" or "update data mirror"
-- **Mirror location**: `../experimental-patent/Sharepoint Mirror 25 Feb 2026/`
+### 4. **read-from-sharepoint**
+- **Purpose**: Read-only access to lab data from synced OneDrive (SharePoint) folders
+- **Trigger**: Any skill or task needing experiment data files
+- **Data locations**:
+  - `~/Library/CloudStorage/OneDrive-SharedLibraries-ImperialCollegeLondon/Skene lab - WB - 07 scRNA-seq/`
+  - `~/Library/CloudStorage/OneDrive-SharedLibraries-ImperialCollegeLondon/Skene lab - WB - 03 scTIP-Seq Development/`
+- **Retry**: Files may need time to sync from cloud — retries up to 3 times with delays (2s, 5s, 10s)
 
-### 5. **sctipseq-data**
-- **Purpose**: Query and analyze single-cell RNA-seq data
-- **Trigger**: Questions about scRNA-seq datasets, analysis
-- **Data source**: Local SharePoint mirror (kept in sync by `sync-data`)
+### 5. **rna-data**
+- **Purpose**: Read and extract RNA quantification data (Qubit, TapeStation, qPCR)
+- **Trigger**: Questions about RNA-seq datasets, QC metrics
+- **Data source**: OneDrive folders (via `read-from-sharepoint`)
+
+### 6. **experiment-summary**
+- **Purpose**: Generate filled-in Experiment Summary .docx from lab data
+- **Trigger**: `/experiment-summary` or "write up an experiment"
+- **Data sources**: Labstep (metadata) + OneDrive (QC files)
 
 ---
 
@@ -52,12 +58,16 @@ All skills are located in `.claude/skills/` and are auto-triggered based on cont
 - **If you are asked to modify a Labstep entry**, ask the user for explicit confirmation:
   - "I can [describe the change]. To proceed, please confirm write: `confirm write`"
 
-### SharePoint (Read-Only)
+### OneDrive / SharePoint (Strictly Read-Only)
 
-- **msgraph-mcp** integration enforces read-only at two layers:
-  1. **OAuth token**: Only `Sites.Read.All` and `Files.Read.All` scopes — write operations are not possible at the API level
-  2. **Skill surface**: Only read tools are exposed (`search_files`, `get_file_content`)
-- Local mirror is kept in sync via `sync-data` skill; prefer querying local copies when available
+**NEVER write, move, rename, copy-into, or delete ANY file under OneDrive paths.**
+
+These folders are shared team resources synced from SharePoint. Any modification propagates to all team members and risks data loss.
+
+- **Allowed**: `open("r")`, `pd.read_excel()`, `pd.read_csv()`, `Document()` (read-only load), `ls`, `find`, `stat`
+- **Forbidden**: Any write, move, rename, delete, or copy-into operation targeting OneDrive paths
+- **All output files** (generated summaries, plots, etc.) must be saved to the **working directory**, never to OneDrive
+- **Retry on failure**: OneDrive files may be cloud-only placeholders that need time to download — always use retry logic (see `read-from-sharepoint` skill)
 
 ---
 
@@ -73,10 +83,10 @@ The `labstep` skill uses a dedicated read-only service account:
 ## Team Workflows
 
 ### Data Pipeline
-1. Use `sync-data` skill to pull latest from SharePoint → local mirror
-2. Query `sctipseq-data` or other analysis skills against local data
+1. Read experiment data directly from OneDrive synced folders (via `read-from-sharepoint` skill)
+2. Query `rna-data` or other analysis skills against OneDrive data
 3. Use `pptx` skill to generate reports/presentations
-4. All modifications happen locally or in user-controlled files; no write-back to Labstep or SharePoint without explicit user request + confirmation
+4. All output files are saved locally in the working directory — no write-back to OneDrive or Labstep without explicit user request + confirmation
 
 ### Lab Queries
 1. Use `labstep` skill to fetch experiments/protocols
@@ -87,9 +97,9 @@ The `labstep` skill uses a dedicated read-only service account:
 
 ## Contacting Admin
 
-If you encounter issues with Labstep or SharePoint access:
+If you encounter issues with Labstep or OneDrive access:
 - Check `.claude/settings.json` for valid credentials
-- Verify network connectivity to Labstep and Azure
+- Verify OneDrive sync status (System Settings > OneDrive)
 - Report access errors to the lab tech lead
 
 ---

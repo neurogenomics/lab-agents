@@ -1,43 +1,72 @@
 ---
-name: rna-quant
-description: Read and extract RNA quantification data from experiment folders. Use when the user wants to read Metadata.xlsx, TapeStation CSVs, or Qubit values from local experiment folders.
+name: rna-data
+description: >
+  Read and extract RNA quantification data (Qubit, TapeStation, qPCR) from
+  experiment folders on OneDrive. Use when the user wants to read Metadata.xlsx,
+  TapeStation CSVs, or Qubit values from experiment folders.
 ---
 
 # RNA Quantification Data Reading Skill
 
-Utilities for reading and extracting RNA quantification metrics (Qubit, TapeStation, etc.) from experiment metadata and QC data files.
+Utilities for reading and extracting RNA quantification metrics (Qubit, TapeStation, etc.) from experiment data files on OneDrive.
+
+**Data source**: OneDrive synced SharePoint folders (see `read-from-sharepoint` skill for paths, retry logic, and read-only policy).
 
 ## Finding experiment folders
 
-Experiment folders are typically named with an experiment ID prefix. To find a folder by ID:
-
 ```python
+from pathlib import Path
+import time, pandas as pd
+
+ONEDRIVE_BASE = Path(
+    "/Users/jaymoore/Library/CloudStorage/"
+    "OneDrive-SharedLibraries-ImperialCollegeLondon"
+)
+SCRNA_ROOT = ONEDRIVE_BASE / "Skene lab - WB - 07 scRNA-seq"
+SCTIP_ROOT = ONEDRIVE_BASE / "Skene lab - WB - 03 scTIP-Seq Development"
+
+def read_with_retry(read_fn, max_retries=3, delays=(2, 5, 10)):
+    """Retry a read that may fail due to OneDrive sync latency."""
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            result = read_fn()
+            if result is None:
+                raise ValueError("Read returned None — file may still be syncing")
+            return result
+        except (FileNotFoundError, PermissionError, OSError, ValueError) as e:
+            last_err = e
+            if attempt < max_retries - 1:
+                wait = delays[attempt] if attempt < len(delays) else delays[-1]
+                print(f"  Retry {attempt + 1}/{max_retries} in {wait}s: {e}")
+                time.sleep(wait)
+    raise last_err
+
 def find_folder(root: Path, prefix: str) -> Path | None:
-    """Find folder in root directory starting with prefix.
-    Returns the candidate with the most .xlsx files (likely has Metadata)."""
-    candidates = [p for p in root.iterdir() if p.is_dir() and p.name.startswith(prefix)]
+    """Find folder in root directory starting with prefix."""
+    try:
+        candidates = read_with_retry(
+            lambda: [p for p in root.iterdir() if p.is_dir() and p.name.startswith(prefix)]
+        )
+    except (FileNotFoundError, OSError):
+        return None
     if not candidates:
         return None
     return max(candidates, key=lambda p: len(list(p.rglob("*.xlsx"))))
 ```
 
-**Usage**: Pass a `Path` to the experiment root directory and an experiment ID prefix.
-
 ## Metadata.xlsx
 
-Most experiments have a `Metadata.xlsx` file with a `Sheet1` containing per-sample rows.
-
 ```python
-import pandas as pd
-folder = find_folder(root_path, "experiment_id")
-meta_files = list(folder.glob("*Metadata*.xlsx"))
-df = pd.read_excel(meta_files[0], sheet_name="Sheet1")
+folder = find_folder(SCRNA_ROOT, "SK550")
+meta_files = read_with_retry(lambda: list(folder.glob("*Metadata*.xlsx")))
+df = read_with_retry(lambda: pd.read_excel(meta_files[0], sheet_name="Sheet1"))
 ```
 
 **Common columns** (names may vary by lab):
 | Column | Description |
 |--------|-------------|
-| `Aim` | Enzyme / condition name (long form, e.g. "SMART MMLV RTase kit") |
+| `Aim` | Enzyme / condition name (long form) |
 | `Sample` | Sample number or identifier |
 | `RNA Qubit Conc (ng/ul)` | RNA yield measurement via Qubit |
 | `Final Lib Qubit Conc (ng/ul)` | DNA library yield |
@@ -45,19 +74,7 @@ df = pd.read_excel(meta_files[0], sheet_name="Sheet1")
 | `TapeStation HS D5000 peak (bp)` | Peak fragment size from TapeStation |
 | `PCR.cycles` | PCR cycling protocol |
 
-**Best practice: always validate Metadata before trusting values.**
-
-```python
-# Check if key columns have data
-ts_col = "TapeStation HS D5000 100-1000 bp Conc (ng/ul)"
-has_data = df[ts_col].notna().any() if ts_col in df.columns else False
-if not has_data:
-    # Consider falling back to TapeStation CSV or other QC files
-```
-
 ## TL / "Too low" Qubit values
-
-RNA Qubit values of "TL" or "Too low" mean below detection limit — treat as 0.0:
 
 ```python
 def qubit_to_float(val) -> float | None:
@@ -74,34 +91,19 @@ def qubit_to_float(val) -> float | None:
 
 ## TapeStation sampleTable CSV
 
-When Metadata.xlsx is missing or empty, read the TapeStation sampleTable CSV directly.
+When Metadata.xlsx is missing or empty, read the TapeStation sampleTable CSV:
 
 ```python
-import pandas as pd
-csvs = list(folder.rglob("*sampleTable.csv"))
-df = pd.read_csv(csvs[0], encoding="latin-1")   # latin-1 required for special characters
-# Drop ladder rows
+csvs = read_with_retry(lambda: list(folder.rglob("*sampleTable.csv")))
+df = read_with_retry(lambda: pd.read_csv(csvs[0], encoding="latin-1"))
 df = df[~df["Sample Description"].str.lower().str.contains("ladder", na=False)]
 ```
 
-**Common columns:** `Well`, `Conc. [pg/µl]`, `Sample Description`, `Alert`, `Observations`
-
-Concentration is typically in **pg/µl**. Convert to ng/µl: `conc_pg / 1000`.
-
-**⚠️ Watch for dilution factors** — some runs use diluted samples. Document any dilution:
-
-```python
-# If samples were diluted before TapeStation run, multiply accordingly
-dilution_factor = 10  # Example: 10× dilution
-conc_ng_ul = (conc_pg / 1000) * dilution_factor
-```
+Concentration is in **pg/ul**. Convert to ng/ul: `conc_pg / 1000`.
 
 ## Enzyme name normalisation
 
-Aim column values are long-form; normalise to short display labels:
-
 ```python
-# IVT
 IVT_NORM = {
     "hiscribet7 ivt kit (neb)": "HiScribe",
     "hiscribet7 1h": "HiScribe", "hiscribet7 2h": "HiScribe",
@@ -113,18 +115,16 @@ IVT_NORM = {
     "negative control": "Neg ctl",
 }
 
-# RT
 RT_NORM = {
     "smart mmlv rtase kit": "SMART",
     "maxima h minus": "Maxima",
     "sigma-aldrich m-mlv reverse transcriptase": "Sigma",
     "sigma-aldrich m-mlv rt": "Sigma",
     "superscript iv": "SuperScript",
-    "superscrip iv": "SuperScript",   # watch for common typos
+    "superscrip iv": "SuperScript",
     "negative control": "Neg ctl",
 }
 
-# PCR
 PCR_NORM = {
     "superfi ii": "SuperFi",
     "phusion high-fidelity": "Phusion",
@@ -133,8 +133,6 @@ PCR_NORM = {
     "negative control": "Neg ctl",
 }
 ```
-
-Always normalise before matching: `aim.strip().lower()`.
 
 ## Reusable helper: build_panel_data
 
@@ -148,10 +146,10 @@ def build_panel_data(experiments, aim_norm, qubit_col, order):
         folder = find_folder(root, exp_id)
         if not folder:
             continue
-        meta_files = list(folder.glob("*Metadata*.xlsx"))
+        meta_files = read_with_retry(lambda: list(folder.glob("*Metadata*.xlsx")))
         if not meta_files:
             continue
-        df = pd.read_excel(meta_files[0], sheet_name="Sheet1")
+        df = read_with_retry(lambda: pd.read_excel(meta_files[0], sheet_name="Sheet1"))
         for _, row in df.iterrows():
             aim   = str(row.get("Aim", "")).strip()
             label = aim_norm.get(aim.lower())
@@ -168,10 +166,9 @@ def build_panel_data(experiments, aim_norm, qubit_col, order):
     return data, exp_ids
 ```
 
-## Tips for working with RNA quantification data
+## Tips
 
-1. **Validate before using** — Always check that Metadata or QC files contain actual data, not just NaN values
-2. **Check units** — Qubit is typically ng/µl; TapeStation conc is in pg/µl (divide by 1000)
+1. **All reads use retry logic** — OneDrive files may need time to sync from cloud
+2. **Check units** — Qubit is ng/ul; TapeStation conc is pg/ul (divide by 1000)
 3. **Note dilutions** — Document any sample dilutions before measurement
-4. **Use consistent metrics** — For comparisons, choose one QC metric (Qubit or TapeStation) and stick with it
-5. **Handle missing data** — Qubit "TL" (too low) values should be treated as 0 or excluded depending on context
+4. **Never write to OneDrive** — all output goes to the working directory

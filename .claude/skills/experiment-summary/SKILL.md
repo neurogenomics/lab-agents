@@ -10,7 +10,7 @@ user_invocable: true
 
 # /experiment-summary
 
-Generate a completed Experiment Summary `.docx` by pulling data from Labstep, SharePoint, and local QC files, then filling in the lab template.
+Generate a completed Experiment Summary `.docx` by pulling data from Labstep and OneDrive, then filling in the lab template.
 
 ## Invocation
 
@@ -66,18 +66,47 @@ From Labstep, attempt to extract:
 | **Methods** | Linked protocol body, or data field named "Methods" |
 | **Discussion** | Comments or data field named "Discussion" / "Notes" |
 
-If a field can't be found in Labstep, note it as missing — you'll ask the user in Step 5.
+If a field can't be found in Labstep, note it as missing — you'll ask the user in Step 4.
 
-### Step 3 — Pull QC data from local files (rna-quant)
+### Step 3 — Pull QC data from OneDrive (read-only)
 
-Search for the experiment folder in the local SharePoint mirror or working directory:
+Read experiment files directly from the synced OneDrive folder. **All reads are strictly read-only.** Use retry logic since files may need time to sync from the cloud.
 
 ```python
-import pandas as pd
+import pandas as pd, time
 from pathlib import Path
 
+ONEDRIVE_BASE = Path(
+    "/Users/jaymoore/Library/CloudStorage/"
+    "OneDrive-SharedLibraries-ImperialCollegeLondon"
+)
+SCRNA_ROOT = ONEDRIVE_BASE / "Skene lab - WB - 07 scRNA-seq"
+SCTIP_ROOT = ONEDRIVE_BASE / "Skene lab - WB - 03 scTIP-Seq Development"
+
+def read_with_retry(read_fn, max_retries=3, delays=(2, 5, 10)):
+    """Retry a read that may fail due to OneDrive sync latency."""
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            result = read_fn()
+            if result is None:
+                raise ValueError("Read returned None — file may still be syncing")
+            return result
+        except (FileNotFoundError, PermissionError, OSError, ValueError) as e:
+            last_err = e
+            if attempt < max_retries - 1:
+                wait = delays[attempt] if attempt < len(delays) else delays[-1]
+                print(f"  Retry {attempt + 1}/{max_retries} in {wait}s: {e}")
+                time.sleep(wait)
+    raise last_err
+
 def find_folder(root: Path, prefix: str) -> Path | None:
-    candidates = [p for p in root.iterdir() if p.is_dir() and p.name.startswith(prefix)]
+    try:
+        candidates = read_with_retry(
+            lambda: [p for p in root.iterdir() if p.is_dir() and p.name.startswith(prefix)]
+        )
+    except (FileNotFoundError, OSError):
+        return None
     if not candidates:
         return None
     return max(candidates, key=lambda p: len(list(p.rglob("*.xlsx"))))
@@ -95,19 +124,17 @@ def qubit_to_float(val) -> float | None:
 ```
 
 **Search order for experiment folder:**
-1. Current working directory
-2. Any subdirectories of the working directory
-3. The local SharePoint mirror (use `sync-data` paths if available)
+1. `SCRNA_ROOT` (scRNA-seq library on OneDrive)
+2. `SCTIP_ROOT` (scTIP-seq library on OneDrive)
 
 **From the experiment folder, extract:**
 
 #### Qubit concentrations
 ```python
-meta_files = list(folder.glob("*Metadata*.xlsx"))
+meta_files = read_with_retry(lambda: list(folder.glob("*Metadata*.xlsx")))
 if meta_files:
-    df = pd.read_excel(meta_files[0], sheet_name="Sheet1")
-    qubit_col = "RNA Qubit Conc (ng/ul)"  # or "Final Lib Qubit Conc (ng/ul)"
-    # Try multiple column names — labs use different headers
+    df = read_with_retry(lambda: pd.read_excel(meta_files[0], sheet_name="Sheet1"))
+    qubit_col = "RNA Qubit Conc (ng/ul)"
     for col in ["RNA Qubit Conc (ng/ul)", "Final Lib Qubit Conc (ng/ul)",
                 "Qubit Conc (ng/ul)", "Qubit (ng/ul)"]:
         if col in df.columns:
@@ -132,30 +159,20 @@ if ts_conc_col in df.columns and df[ts_conc_col].notna().any():
     }
 else:
     # Fall back to TapeStation sampleTable CSV
-    csvs = list(folder.rglob("*sampleTable.csv"))
+    csvs = read_with_retry(lambda: list(folder.rglob("*sampleTable.csv")))
     if csvs:
-        ts_df = pd.read_csv(csvs[0], encoding="latin-1")
+        ts_df = read_with_retry(lambda: pd.read_csv(csvs[0], encoding="latin-1"))
         ts_df = ts_df[~ts_df["Sample Description"].str.lower().str.contains("ladder", na=False)]
-        # Extract concentration (pg/µl → ng/µl)
         tapestation = {
             "conc": f"{ts_df['Conc. [pg/µl]'].mean() / 1000:.2f} ng/µl (mean)",
             "size": "",
         }
 ```
 
-### Step 4 — Pull files from SharePoint (if local data is missing)
+#### If files fail after all retries
+Report the error and suggest the user check OneDrive sync status (System Settings > OneDrive).
 
-If the experiment folder wasn't found locally, try the SharePoint MCP:
-
-```
-Use the sharepoint MCP tools:
-- search_files: find "SK550 Metadata" or "SK550 TapeStation"
-- get_file_content: download the Metadata.xlsx or sampleTable.csv
-```
-
-Save any downloaded files to a temporary location and parse as in Step 3.
-
-### Step 5 — Confirm with user
+### Step 4 — Confirm with user
 
 Present a summary of what was found and what's missing:
 
@@ -177,7 +194,7 @@ Please provide the missing fields, or type "skip" to leave them blank.
 
 Wait for the user to fill in missing fields or confirm.
 
-### Step 6 — Generate the document
+### Step 5 — Generate the document
 
 ```python
 from docx import Document
@@ -212,7 +229,7 @@ def fill_experiment_summary(
             p.clear()
             p.add_run(f"Discussion and comparison to past experiments\n{discussion}")
 
-    # Fill Qubit table (Table 0) — clear template rows, add actual data
+    # Fill Qubit table (Table 0)
     qubit_table = doc.tables[0]
     while len(qubit_table.rows) > 2:
         qubit_table._tbl.remove(qubit_table.rows[2]._tr)
@@ -240,27 +257,26 @@ def fill_experiment_summary(
     return output_path
 ```
 
-### Step 7 — Save and report
+### Step 6 — Save and report
 
 - Save as `<experiment_id>_Experiment_Summary.docx` in the current working directory
 - Tell the user the output path
-- Never overwrite the template
+- **Never overwrite the template**
+- **Never write any file to OneDrive paths**
 
 ---
 
 ## Data source priority
-
-For each field, prefer data in this order:
 
 | Field | 1st choice | 2nd choice | 3rd choice |
 |-------|-----------|-----------|-----------|
 | Model | Labstep data field | User input | — |
 | Aim | Labstep data field / entry | User input | — |
 | Methods | Labstep linked protocol | User input | — |
-| Qubit | Local Metadata.xlsx | SharePoint file | User input |
-| TapeStation | Local Metadata.xlsx or CSV | SharePoint file | User input |
-| qPCR | Local files | Labstep tables | User input |
-| Imaging | Local image files | — | User input |
+| Qubit | OneDrive Metadata.xlsx | User input | — |
+| TapeStation | OneDrive Metadata.xlsx or CSV | User input | — |
+| qPCR | OneDrive files | Labstep tables | User input |
+| Imaging | OneDrive image files | User input | — |
 | Discussion | Labstep comments | User input | — |
 
 ---
@@ -290,8 +306,9 @@ pip install python-docx labstep pandas openpyxl
 ## Important notes
 
 - **Never overwrite the template** — always save as a new file
+- **OneDrive is strictly read-only** — never write, move, rename, or delete files in OneDrive paths
 - **Labstep is read-only** — do not create or modify Labstep entries (see CLAUDE.md)
-- **SharePoint is read-only** — only use `search_files` and `get_file_content`
+- **Retry on failure** — OneDrive files may need time to sync; retry up to 3 times with delays (2s, 5s, 10s)
 - Qubit "TL" / "Too low" values → treat as 0.0
 - TapeStation CSV concentrations are in pg/µl — divide by 1000 for ng/µl
-- If multiple data sources disagree, prefer the local file data and flag the discrepancy to the user
+- If multiple data sources disagree, prefer the OneDrive file data and flag the discrepancy to the user
