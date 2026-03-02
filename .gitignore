@@ -1,0 +1,35 @@
+# Credentials and sensitive data
+.claude/settings.json
+
+# OS and editor files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Node/npm
+node_modules/
+package-lock.json
+yarn.lock
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.log
+
+# SharePoint mirror (large, sync separately)
+# Note: Keep local mirror in experimental-patent project, not here
