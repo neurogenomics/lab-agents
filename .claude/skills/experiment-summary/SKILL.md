@@ -39,9 +39,27 @@ Parse the argument as an experiment ID (e.g. `SK550`) or a search term.
 Use the `labstep` skill's API to fetch experiment details:
 
 ```python
-import os, labstep
+import os, json, requests, labstep
+from labstep.service.config import configService
+from pathlib import Path
 
-user = labstep.authenticate(apikey=os.environ["LABSTEP_API_KEY"])
+def get_labstep_apikey() -> str:
+    """Get Labstep API key from env var or .claude/settings.json."""
+    key = os.environ.get("LABSTEP_API_KEY")
+    if key:
+        return key
+    settings = Path(".claude/settings.json")
+    if settings.exists():
+        cfg = json.loads(settings.read_text())
+        key = cfg.get("skillsConfig", {}).get("labstep", {}).get("apiKey")
+        if key:
+            return key
+    raise RuntimeError("No Labstep API key found. Set LABSTEP_API_KEY or configure .claude/settings.json")
+
+api_key = get_labstep_apikey()
+user = labstep.authenticate(apikey=api_key)
+base = configService.getHost()          # https://api.labstep.com
+headers = {"apikey": api_key}
 
 # Search by name/ID
 experiments = user.getExperiments(search_query="SK550", count=5)
@@ -60,8 +78,79 @@ From Labstep, attempt to extract:
 |-------|--------|
 | **Model** | Data field named "Model" or "Cell line", or parse from experiment name |
 | **Aim** | Data field named "Aim", or the experiment description/entry |
-| **Methods** | Linked protocol body, or data field named "Methods" |
+| **Methods** | Linked protocol bodies (see below) |
 | **Discussion** | Comments or data field named "Discussion" / "Notes" |
+
+#### Extracting protocol body text
+
+Protocol content in Labstep is stored as ProseMirror JSON in the `state` field. The experiment-linked protocol copies often have **empty steps** — the actual content lives on the **protocol-collection's `last_version`**.
+
+```python
+def extract_text(node):
+    """Recursively extract plain text from a ProseMirror node."""
+    if isinstance(node, str):
+        return node
+    if isinstance(node, dict):
+        text = node.get("text", "")
+        if text:
+            return text
+        children = node.get("content", [])
+        result = "".join(extract_text(c) for c in children)
+        if node.get("type") in ("paragraph", "heading", "blockquote", "list_item", "hard_break"):
+            result += "\n"
+        return result
+    if isinstance(node, list):
+        return "".join(extract_text(n) for n in node)
+    return ""
+
+def get_protocol_body(protocol, headers, base) -> str:
+    """Get the full text body of a protocol.
+    Tries the protocol-collection's last_version first (where content
+    usually lives), then falls back to the experiment-linked copy."""
+    # 1. Try the protocol-collection template (has actual content)
+    collection_id = getattr(protocol, "protocol_collection_id", None)
+    if collection_id:
+        try:
+            coll = requests.get(
+                f"{base}/api/generic/protocol-collection/{collection_id}",
+                headers=headers,
+            ).json()
+            version = coll.get("last_version") or coll.get("draft_version")
+            if version and version.get("id"):
+                vresp = requests.get(
+                    f"{base}/api/generic/protocol/{version['id']}",
+                    headers=headers,
+                ).json()
+                state = vresp.get("state")
+                if state:
+                    return extract_text(state).strip()
+        except Exception:
+            pass
+
+    # 2. Fallback: experiment-linked protocol body
+    try:
+        resp = requests.get(
+            f"{base}/api/generic/experiment/{protocol.id}",
+            headers=headers,
+        ).json()
+        state = resp.get("state")
+        if state:
+            return extract_text(state).strip()
+    except Exception:
+        pass
+
+    return ""
+
+# Collect all protocol texts for the Methods section
+methods_parts = []
+for p in protocols:
+    body = get_protocol_body(p, headers, base)
+    if body:
+        methods_parts.append(f"### {p.name}\n\n{body}")
+    else:
+        methods_parts.append(f"### {p.name}\n\n*(No body text found — protocol may be a draft)*")
+methods_text = "\n\n".join(methods_parts)
+```
 
 **Always attempt Labstep lookup** — even if the experiment name doesn't match exactly, try partial matches (e.g. search for date, keywords from the folder name). Record which Labstep experiment was matched (if any) for the Sources section.
 

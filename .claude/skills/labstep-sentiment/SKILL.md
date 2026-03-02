@@ -10,10 +10,24 @@ Analyse the sentiment and scientific outcome of experiments stored in Labstep. T
 ## Authentication
 
 ```python
-import os, requests, labstep
+import os, json, requests, labstep
 from labstep.service.config import configService
+from pathlib import Path
 
-api_key = os.environ["LABSTEP_API_KEY"]
+def get_labstep_apikey() -> str:
+    """Get Labstep API key from env var or .claude/settings.json."""
+    key = os.environ.get("LABSTEP_API_KEY")
+    if key:
+        return key
+    settings = Path(".claude/settings.json")
+    if settings.exists():
+        cfg = json.loads(settings.read_text())
+        key = cfg.get("skillsConfig", {}).get("labstep", {}).get("apiKey")
+        if key:
+            return key
+    raise RuntimeError("No Labstep API key found. Set LABSTEP_API_KEY or configure .claude/settings.json")
+
+api_key = get_labstep_apikey()
 user = labstep.authenticate(apikey=api_key)
 base = configService.getHost()          # https://api.labstep.com
 headers = {"apikey": api_key}
