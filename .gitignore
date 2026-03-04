@@ -36,8 +36,8 @@ apm_modules/
 CLAUDE.md
 AGENTS.md
 
-# APM output (dependency skills installed by apm install)
-.claude/skills/pptx/
+# APM output (symlinks + deps populated by apm install/compile)
+.claude/skills/
 
 # SharePoint mirror (large, sync separately)
 # Note: Keep local mirror in experimental-patent project, not here
