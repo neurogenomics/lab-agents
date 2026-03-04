@@ -32,7 +32,6 @@ yarn.lock
 *.log
 
 # APM
-.apm/
 apm_modules/
 CLAUDE.md
 AGENTS.md
