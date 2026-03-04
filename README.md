@@ -15,7 +15,7 @@ Compatible with any agent that supports the [Agent Skills](https://github.com/an
 
 1. Install with APM:
    ```bash
-   apm install neurogenomics/lab-agents
+   apm install neurogenomics/lab-agents/lab-skills
    apm compile --target all
    ```
 2. Add your Labstep API key to `.env`:
