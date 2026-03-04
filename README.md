@@ -2,12 +2,12 @@
 
 A shared AI coding-agent environment for the Imperial College London Neurogenomics lab, with integrated access to Labstep (lab notebook), OneDrive/SharePoint (shared data files), and local data analysis tools.
 
-Compatible with any agent that supports the [Agent Skills](https://github.com/anthropics/skills) standard — Claude Code, OpenCode, [GitHub Copilot](https://github.com/features/copilot), and others.
+Compatible with any agent that supports the [Agent Skills](https://github.com/anthropics/skills) standard — [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenCode](https://github.com/opencode-ai/opencode), [GitHub Copilot](https://github.com/features/copilot), and others.
 
 ## Quick Start
 
 ### Prerequisites
-- An AI coding agent CLI (e.g. [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenCode](https://github.com/opencode-ai/opencode), GitHub Copilot)
+- An AI coding agent CLI (e.g. [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenCode](https://github.com/opencode-ai/opencode), [GitHub Copilot](https://github.com/features/copilot))
 - [APM](https://github.com/microsoft/apm) installed
 - Labstep API key
 
