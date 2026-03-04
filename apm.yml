@@ -1,0 +1,10 @@
+name: lab-agents
+version: 1.0.0
+description: "Shared AI agent environment for Imperial Lab (Skene Lab) \u2014 manages\
+  \ lab notebook queries, data analysis, and report generation"
+author: Jay Moore
+dependencies:
+  apm:
+  - anthropics/skills/skills/pptx
+  mcp: []
+scripts: {}

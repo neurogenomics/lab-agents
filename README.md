@@ -74,15 +74,12 @@ Generate and modify PowerPoint presentations from data or text.
 
 ### Prerequisites
 - Claude Code CLI installed
-- OneDrive syncing the Skene lab shared libraries
 - Labstep API key configured in `.claude/settings.json`
 
 ### Setup
 
-1. Follow the detailed setup guide in `SETUP_INSTRUCTIONS.md`
-2. Add your Labstep API key to `.claude/settings.json`
-3. Ensure OneDrive is syncing (System Settings > OneDrive)
-4. Verify: `claude "What skills are available?"`
+1. Add your Labstep API key to `.claude/settings.json`
+2. Verify: `claude "What skills are available?"`
 
 ## Security
 
@@ -106,15 +103,12 @@ lab-agents/
 │       └── experiment-summary/
 ├── support/                   # Templates (Experiment Summary Template.docx)
 ├── CLAUDE.md                  # Team policies & skill docs
-├── SETUP_INSTRUCTIONS.md      # Detailed setup guide
-├── SETUP_CHECKLIST.md         # Progress tracker
 └── README.md                  # This file
 ```
 
 ## Documentation
 
 - **`CLAUDE.md`** — Team policies, security guidelines, and skill reference
-- **`SETUP_INSTRUCTIONS.md`** — Labstep and OneDrive setup guide
 - **`.claude/skills/*/SKILL.md`** — Individual skill documentation
 
 ## Links
