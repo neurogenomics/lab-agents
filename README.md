@@ -74,12 +74,17 @@ Generate and modify PowerPoint presentations from data or text.
 
 ### Prerequisites
 - Claude Code CLI installed
+- [APM](https://github.com/microsoft/apm) installed
 - Labstep API key configured in `.claude/settings.json`
 
 ### Setup
 
-1. Add your Labstep API key to `.claude/settings.json`
-2. Verify: `claude "What skills are available?"`
+1. Install skills with APM:
+   ```bash
+   apm install lab-agents
+   ```
+2. Add your Labstep API key to `.claude/settings.json`
+3. Verify: `claude "What skills are available?"`
 
 ## Security
 
