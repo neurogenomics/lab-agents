@@ -2,6 +2,22 @@
 
 A shared Claude Code environment for the Imperial College London Neurogenomics lab, with integrated access to Labstep (lab notebook), OneDrive/SharePoint (shared data files), and local data analysis tools.
 
+## Quick Start
+
+### Prerequisites
+- Claude Code CLI installed
+- [APM](https://github.com/microsoft/apm) installed
+- Labstep API key configured in `.claude/settings.json`
+
+### Setup
+
+1. Install skills with APM:
+   ```bash
+   apm install
+   ```
+2. Add your Labstep API key to `.claude/settings.json`
+3. Verify: `claude "What skills are available?"`
+
 ## Skills
 
 ### 1. labstep
@@ -70,54 +86,8 @@ Generate and modify PowerPoint presentations from data or text.
 > Read the contents of results_deck.pptx
 ```
 
-## Quick Start
-
-### Prerequisites
-- Claude Code CLI installed
-- [APM](https://github.com/microsoft/apm) installed
-- Labstep API key configured in `.claude/settings.json`
-
-### Setup
-
-1. Install skills with APM:
-   ```bash
-   apm install lab-agents
-   ```
-2. Add your Labstep API key to `.claude/settings.json`
-3. Verify: `claude "What skills are available?"`
-
-## Security
-
-- **OneDrive is strictly read-only** — agents will never write, move, rename, or delete files under OneDrive paths
-- **Labstep is read-only** — write operations require explicit user confirmation (`confirm write`)
-- **All output files** are saved to the working directory, never to shared locations
-- Credentials stored in `.claude/settings.json` (git-ignored)
-
-## Folder Structure
-
-```
-lab-agents/
-├── .claude/
-│   ├── settings.json          # Credentials (git-ignored)
-│   └── skills/
-│       ├── labstep/
-│       ├── labstep-sentiment/
-│       ├── pptx/
-│       ├── read-from-sharepoint/
-│       ├── nucleic-acid-analysis/
-│       └── experiment-summary/
-├── support/                   # Templates (Experiment Summary Template.docx)
-├── CLAUDE.md                  # Team policies & skill docs
-└── README.md                  # This file
-```
-
-## Documentation
-
-- **`CLAUDE.md`** — Team policies, security guidelines, and skill reference
-- **`.claude/skills/*/SKILL.md`** — Individual skill documentation
-
 ## Links
 
 - [Neurogenomics Lab GitHub](https://github.com/neurogenomics)
-- [Labstep Docs](https://docs.labstep.com/)
+- [Labstep API Docs](https://apidoc.labstep.com)
 - [Claude Code Docs](https://docs.anthropic.com/en/docs/claude-code)
