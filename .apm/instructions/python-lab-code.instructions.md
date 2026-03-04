@@ -10,8 +10,8 @@ version: 1.0.0
 ## Authentication Pattern
 
 Use `get_labstep_apikey()` for Labstep authentication:
-- Check `LABSTEP_API_KEY` env var first
-- Fall back to `.claude/settings.json` (`skillsConfig.labstep.apiKey`)
+- Loads `.env` via `python-dotenv`
+- Reads `LABSTEP_API_KEY` from environment
 
 ## OneDrive Data Access
 

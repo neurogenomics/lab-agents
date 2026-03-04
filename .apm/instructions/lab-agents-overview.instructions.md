@@ -55,7 +55,7 @@ All skills are located in `.claude/skills/` and are auto-triggered based on cont
 The `labstep` skill uses a dedicated read-only service account:
 - **Account**: `lab-agent-readonly@imperial.ac.uk`
 - **Permission level**: Workspace **Viewer** role
-- **API key location**: `.claude/settings.json` (configured by admin)
+- **API key location**: `.env` file (`LABSTEP_API_KEY`)
 
 ## Team Workflows
 
@@ -73,7 +73,7 @@ The `labstep` skill uses a dedicated read-only service account:
 ## Contacting Admin
 
 If you encounter issues with Labstep or OneDrive access:
-- Check `.claude/settings.json` for valid credentials
+- Check `.env` for valid `LABSTEP_API_KEY`
 - Verify OneDrive sync status (System Settings > OneDrive)
 - Report access errors to the lab tech lead
 

@@ -19,15 +19,9 @@ Compatible with any agent that supports the [Agent Skills](https://github.com/an
    cd lab-agents
    apm install
    ```
-2. Add your Labstep API key to `.claude/settings.json`:
-   ```json
-   {
-     "skillsConfig": {
-       "labstep": {
-         "apiKey": "YOUR_KEY_HERE"
-       }
-     }
-   }
+2. Add your Labstep API key to `.env`:
+   ```bash
+   LABSTEP_API_KEY=your_key_here
    ```
 3. Launch your agent from the repo directory and ask what skills are available.
 

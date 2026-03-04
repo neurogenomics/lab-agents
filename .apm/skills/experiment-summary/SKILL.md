@@ -39,22 +39,17 @@ Parse the argument as an experiment ID (e.g. `SK550`) or a search term.
 Use the `labstep` skill's API to fetch experiment details:
 
 ```python
-import os, json, requests, labstep
+import os, requests, labstep
 from labstep.service.config import configService
-from pathlib import Path
 
 def get_labstep_apikey() -> str:
-    """Get Labstep API key from env var or .claude/settings.json."""
+    """Get Labstep API key from .env file or environment variable."""
+    from dotenv import load_dotenv
+    load_dotenv()
     key = os.environ.get("LABSTEP_API_KEY")
     if key:
         return key
-    settings = Path(".claude/settings.json")
-    if settings.exists():
-        cfg = json.loads(settings.read_text())
-        key = cfg.get("skillsConfig", {}).get("labstep", {}).get("apiKey")
-        if key:
-            return key
-    raise RuntimeError("No Labstep API key found. Set LABSTEP_API_KEY or configure .claude/settings.json")
+    raise RuntimeError("No Labstep API key found. Set LABSTEP_API_KEY in .env")
 
 api_key = get_labstep_apikey()
 user = labstep.authenticate(apikey=api_key)

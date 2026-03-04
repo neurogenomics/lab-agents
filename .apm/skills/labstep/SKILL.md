@@ -9,24 +9,19 @@ You are helping the user interact with the Labstep API using the `labstep` Pytho
 
 ## Authentication
 
-Authenticate using the `LABSTEP_API_KEY` env var, or fall back to `.claude/settings.json`:
+Authenticate using the `LABSTEP_API_KEY` variable from `.env`:
 
 ```python
-import os, json, labstep
-from pathlib import Path
+import os, labstep
 
 def get_labstep_apikey() -> str:
-    """Get Labstep API key from env var or .claude/settings.json."""
+    """Get Labstep API key from .env file or environment variable."""
+    from dotenv import load_dotenv
+    load_dotenv()
     key = os.environ.get("LABSTEP_API_KEY")
     if key:
         return key
-    settings = Path(".claude/settings.json")
-    if settings.exists():
-        cfg = json.loads(settings.read_text())
-        key = cfg.get("skillsConfig", {}).get("labstep", {}).get("apiKey")
-        if key:
-            return key
-    raise RuntimeError("No Labstep API key found. Set LABSTEP_API_KEY or configure .claude/settings.json")
+    raise RuntimeError("No Labstep API key found. Set LABSTEP_API_KEY in .env")
 
 user = labstep.authenticate(apikey=get_labstep_apikey())
 ```
