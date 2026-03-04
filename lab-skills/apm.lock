@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-03-04T14:51:45.345684+00:00'
+generated_at: '2026-03-04T15:17:14.334044+00:00'
 apm_version: 0.7.4
 dependencies:
 - repo_url: anthropics/skills
@@ -7,3 +7,6 @@ dependencies:
   resolved_commit: 3d59511518591fa82e6cfcf0438d68dd5dad3e76
   virtual_path: skills/pptx
   is_virtual: true
+- repo_url: neurogenomics/lab-agents
+  host: github.com
+  resolved_commit: faf7e1da69e82d8c129163fcf6717e47d49e347c

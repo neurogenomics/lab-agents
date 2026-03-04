@@ -6,5 +6,6 @@ author: Jay Moore
 dependencies:
   apm:
   - anthropics/skills/skills/pptx
+  - neurogenomics/lab-agents
   mcp: []
 scripts: {}
