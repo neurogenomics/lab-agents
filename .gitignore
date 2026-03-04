@@ -33,11 +33,14 @@ yarn.lock
 
 # APM
 apm_modules/
+CLAUDE.md
+AGENTS.md
+
+# APM output (dependency skills installed by apm install)
+.claude/skills/pptx/
 
 # SharePoint mirror (large, sync separately)
 # Note: Keep local mirror in experimental-patent project, not here
 
-
 # APM integrated skills
 .github/skills/*-apm/
-# APM integrated skills

@@ -61,20 +61,6 @@ All operations start from the authenticated `user` object.
 - `user.getWorkspaces()`, `user.getDevices()`, `user.getTags()`
 - `user.getOrderRequests()`, `user.getPurchaseOrders()`
 
-**Create entities:**
-- `user.newExperiment(name, entry=None, template_id=None)`
-- `user.newProtocol(name)`
-- `user.newResource(name, resource_category_id=None)`
-- `user.newResourceCategory(name)`
-- `user.newResourceLocation(name, outer_location_guid=None)`
-- `user.newWorkspace(name)`
-- `user.newTag(name, type)` — type is `'experiment'` or `'protocol'` or `'resource'`
-- `user.newCollection(name, type='experiment')`
-- `user.newDevice(name, device_category_id=None)`
-- `user.newOrderRequest(resource_id, purchase_order_id=None, quantity=1)`
-- `user.newFile(filepath=None, rawData=None)`
-- `user.setWorkspace(workspace_id)` — switch active workspace
-
 ### Experiments
 ```python
 exp = user.newExperiment('My Experiment')
