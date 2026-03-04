@@ -1,22 +1,35 @@
 # Lab-Agents
 
-A shared Claude Code environment for the Imperial College London Neurogenomics lab, with integrated access to Labstep (lab notebook), OneDrive/SharePoint (shared data files), and local data analysis tools.
+A shared AI coding-agent environment for the Imperial College London Neurogenomics lab, with integrated access to Labstep (lab notebook), OneDrive/SharePoint (shared data files), and local data analysis tools.
+
+Compatible with any agent that supports the [Agent Skills](https://github.com/anthropics/skills) standard — Claude Code, OpenCode, GitHub Copilot, and others.
 
 ## Quick Start
 
 ### Prerequisites
-- Claude Code CLI installed
+- An AI coding agent CLI (e.g. [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenCode](https://github.com/opencode-ai/opencode), GitHub Copilot)
 - [APM](https://github.com/microsoft/apm) installed
-- Labstep API key configured in `.claude/settings.json`
+- Labstep API key
 
 ### Setup
 
-1. Install skills with APM:
+1. Clone and install dependencies:
    ```bash
+   git clone https://github.com/neurogenomics/lab-agents.git
+   cd lab-agents
    apm install
    ```
-2. Add your Labstep API key to `.claude/settings.json`
-3. Verify: `claude "What skills are available?"`
+2. Add your Labstep API key to `.claude/settings.json`:
+   ```json
+   {
+     "skillsConfig": {
+       "labstep": {
+         "apiKey": "YOUR_KEY_HERE"
+       }
+     }
+   }
+   ```
+3. Launch your agent from the repo directory and ask what skills are available.
 
 ## Skills
 
@@ -90,4 +103,5 @@ Generate and modify PowerPoint presentations from data or text.
 
 - [Neurogenomics Lab GitHub](https://github.com/neurogenomics)
 - [Labstep API Docs](https://apidoc.labstep.com)
-- [Claude Code Docs](https://docs.anthropic.com/en/docs/claude-code)
+- [Agent Skills Spec](https://github.com/anthropics/skills)
+- [APM (Agent Package Manager)](https://github.com/microsoft/apm)
